@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GREEN-API Тестовый стенд</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 30px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border: 1px solid #999;
+            display: flex;
+        }
+        .left {
+            width: 340px;
+            background: #f5f5f5;
+            padding: 20px;
+            border-right: 1px solid #999;
+        }
+        .left .field {
+            margin-bottom: 12px;
+        }
+        .left label {
+            display: block;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .left input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #888;
+            font-size: 12px;
+            font-family: monospace;
+            background: white;
+        }
+        .left button {
+            width: 100%;
+            padding: 6px 10px;
+            margin-bottom: 15px;
+            background: #e0e0e0;
+            border: 1px solid #888;
+            font-size: 13px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .left button:hover {
+            background: #ccc;
+        }
+        .left .btn-green {
+            background: #28a745;
+            border-color: #1e7e34;
+            color: white;
+        }
+        .left .btn-green:hover {
+            background: #218838;
+        }
+        .separator {
+            height: 1px;
+            background: #ccc;
+            margin: 12px 0;
+        }
+        .hint {
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+        }
+        .right {
+            flex: 1;
+            padding: 20px;
+            background: white;
+        }
+        .right label {
+            font-size: 12px;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .response-box {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 15px;
+            border: 1px solid #444;
+            min-height: 500px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            overflow: auto;
+        }
+        .status-line {
+            font-size: 10px;
+            color: #666;
+            margin-top: 8px;
+            text-align: center;
+        }
+        /* Дополнительный стиль для поля с паролем */
+        input[type="password"] {
+            font-family: monospace;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="left">
+        <div class="field">
+            <label>idInstance</label>
+            <input type="text" id="idInstance" placeholder="" value="">
+        </div>
+        <div class="field">
+            <label>apiTokenInstance</label>
+            <input type="password" id="apiTokenInstance" placeholder="" value="">
+        </div>
+
+        <button id="getSettingsBtn">getSettings</button>
+        <button id="getStateBtn">getStateInstance</button>
+
+        <div class="separator"></div>
+
+        <div class="field">
+            <label>Номер телефона</label>
+            <input type="text" id="phoneMsg" placeholder="79001234567" value="">
+            <div class="hint">Введите номер в формате 79001234567 (без + и скобок)</div>
+        </div>
+        <div class="field">
+            <label>Текст сообщения</label>
+            <input type="text" id="messageText" placeholder="Hello World!" value="">
+        </div>
+        <button id="sendMessageBtn" class="btn-green">sendMessage</button>
+
+        <div class="separator"></div>
+
+        <div class="field">
+            <label>Номер телефона</label>
+            <input type="text" id="phoneFile" placeholder="79001234567" value="">
+            <div class="hint">Введите номер в формате 79001234567 (без + и скобок)</div>
+        </div>
+        <div class="field">
+            <label>URL файла</label>
+            <input type="text" id="fileUrl" placeholder="https://example.com/image.jpg" value="">
+            <div class="hint">Прямая ссылка на файл (изображение, PDF, документ)</div>
+        </div>
+        <button id="sendFileBtn" class="btn-green">sendFileByUrl</button>
+
+        <div class="status-line" id="stateHint"></div>
+    </div>
+
+    <div class="right">
+        <label>Ответ метода:</label>
+        <div class="response-box" id="responseOutput">
+            {}
+        </div>
+        <div class="status-line" style="margin-top: 10px;">Результат выполнения метода отображается выше (только чтение)</div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = 'https://api.green-api.com';
+
+    function getCreds() {
+        return {
+            id: document.getElementById('idInstance').value.trim(),
+            token: document.getElementById('apiTokenInstance').value.trim()
+        };
+    }
+
+    function setOutput(text) {
+        document.getElementById('responseOutput').textContent = text;
+    }
+
+    function formatPhoneToChatId(phone) {
+        let v = phone.trim();
+        if (!v) return '';
+        if (v.startsWith('+')) v = v.substring(1);
+        v = v.replace(/\D/g, '');
+        if (v.startsWith('8') && v.length === 11) {
+            v = '7' + v.substring(1);
+        }
+        return v + '@c.us';
+    }
+
+    function getFileNameFromUrl(url) {
+        try {
+            let parts = url.split('/');
+            let fileName = parts[parts.length - 1];
+            if (fileName.includes('?')) fileName = fileName.split('?')[0];
+            if (fileName.includes('#')) fileName = fileName.split('#')[0];
+            if (fileName && fileName.includes('.')) return fileName;
+            return 'file.pdf';
+        } catch(e) {
+            return 'file.pdf';
+        }
+    }
+
+    async function callAPI(method, bodyObj = null) {
+        const { id, token } = getCreds();
+        if (!id || !token) {
+            setOutput('Ошибка: заполните idInstance и apiTokenInstance');
+            return;
+        }
+
+        let url = '';
+        let options = {
+            headers: { 'Content-Type': 'application/json' }
+        };
+
+        switch(method) {
+            case 'getSettings':
+                url = `${API_BASE}/waInstance${id}/getSettings/${token}`;
+                options.method = 'GET';
+                break;
+            case 'getStateInstance':
+                url = `${API_BASE}/waInstance${id}/getStateInstance/${token}`;
+                options.method = 'GET';
+                break;
+            case 'sendMessage':
+                url = `${API_BASE}/waInstance${id}/sendMessage/${token}`;
+                options.method = 'POST';
+                options.body = JSON.stringify(bodyObj);
+                break;
+            case 'sendFileByUrl':
+                url = `${API_BASE}/waInstance${id}/sendFileByUrl/${token}`;
+                options.method = 'POST';
+                options.body = JSON.stringify(bodyObj);
+                break;
+            default:
+                setOutput('Неизвестный метод');
+                return;
+        }
+
+        try {
+            setOutput('Отправка запроса...');
+            const resp = await fetch(url, options);
+            const data = await resp.json();
+            if (resp.ok) {
+                setOutput(JSON.stringify(data, null, 2));
+                if (method === 'getStateInstance' && data.stateInstance) {
+                    const hint = document.getElementById('stateHint');
+                    if (data.stateInstance === 'authorized') {
+                        hint.innerHTML = 'Инстанс авторизован';
+                        hint.style.color = '#2b6e3c';
+                    } else if (data.stateInstance === 'notAuthorized') {
+                        hint.innerHTML = 'Инстанс не авторизован. Отсканируйте QR-код.';
+                        hint.style.color = '#b85c00';
+                    } else {
+                        hint.innerHTML = 'Состояние: ' + data.stateInstance;
+                        hint.style.color = '#666';
+                    }
+                }
+            } else {
+                setOutput(`Ошибка HTTP ${resp.status}:\n${JSON.stringify(data, null, 2)}`);
+            }
+        } catch(err) {
+            setOutput(`Ошибка: ${err.message}`);
+        }
+    }
+
+    document.getElementById('getSettingsBtn').onclick = () => callAPI('getSettings');
+    document.getElementById('getStateBtn').onclick = () => callAPI('getStateInstance');
+    
+    document.getElementById('sendMessageBtn').onclick = () => {
+        let phone = document.getElementById('phoneMsg').value;
+        let msg = document.getElementById('messageText').value;
+        if (!phone) { setOutput('Ошибка: укажите номер телефона'); return; }
+        if (!msg) { setOutput('Ошибка: введите текст сообщения'); return; }
+        let chatId = formatPhoneToChatId(phone);
+        if (!chatId || chatId === '@c.us') { setOutput('Ошибка: неверный формат номера'); return; }
+        callAPI('sendMessage', { chatId: chatId, message: msg });
+    };
+    
+    document.getElementById('sendFileBtn').onclick = () => {
+        let phone = document.getElementById('phoneFile').value;
+        let fileUrl = document.getElementById('fileUrl').value;
+        if (!phone) { setOutput('Ошибка: укажите номер телефона'); return; }
+        if (!fileUrl) { setOutput('Ошибка: укажите URL файла'); return; }
+        
+        let chatId = formatPhoneToChatId(phone);
+        if (!chatId || chatId === '@c.us') { setOutput('Ошибка: неверный формат номера'); return; }
+        
+        let fileName = getFileNameFromUrl(fileUrl);
+        
+        callAPI('sendFileByUrl', { 
+            chatId: chatId, 
+            urlFile: fileUrl,
+            fileName: fileName 
+        });
+    };
+</script>
+</body>
+</html>
